@@ -16,7 +16,9 @@ import javax.jms.TextMessage;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 
+import org.camunda.bpm.engine.HistoryService;
 import org.camunda.bpm.engine.RuntimeService;
+import org.camunda.bpm.engine.history.HistoricActivityInstance;
 import org.camunda.bpm.engine.runtime.Execution;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 
@@ -26,6 +28,9 @@ public class CallbackService {
 
   @Inject
   private RuntimeService runtimeService;
+  
+  @Inject
+  private HistoryService historyService;
   
   @PersistenceContext
   private EntityManager entityManager;
@@ -51,17 +56,53 @@ public class CallbackService {
 //    runtimeService.messageEventReceived(messageName, execution.getId());
 	  
 
+    // UUID
 //    Map<String,Object> correlationKeys = new HashMap<String, Object>();
 //	  correlationKeys.put("correllationId", correlationKey);
 //	  Map<String, Object> variables = new HashMap<String, Object>();
 //    variables.put("payload", payload);
 //    runtimeService.correlateMessage(messageName, correlationKeys);
 	  
+    // UUID
 	  runtimeService.createMessageCorrelation(messageName)
 	  	.processInstanceVariableEquals("correllationId", correlationKey)
+//	  	.processInstanceActivityId("receiveTaskId") // not implemented
 	  	.setVariable("payload", payload)
 	  	.correlate();
+
+    String receiveTaskId;
+    Execution execution = runtimeService.createExecutionQuery()
+      .messageEventSubscriptionName(messageName)
+      .processInstanceBusinessKey(correlationKey) // proces instance
+      .activityId(receiveTaskId) // token
+      .singleResult();
+    runtimeService.messageEventReceived(messageName, execution.getId());
+    
+    
+    // Business Key
+	  String businessKey = correlationKey; // TODO: Retrieve business key from message
+	  runtimeService.createMessageCorrelation(messageName)
+	    .processInstanceBusinessKey(businessKey)
+      .setVariable("payload", payload)
+      .correlate();
 	  
+	  ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
+      .processInstanceBusinessKey(correlationKey) // requires unique business key
+      .singleResult();
+    
+    HistoricActivityInstance historicActivityInstance = historyService.createHistoricActivityInstanceQuery()
+      .processInstanceId(processInstance.getId())
+      .activityId("SendTask_1")
+      .singleResult();
+    
+    runtimeService.messageEventReceived(messageName, historicActivityInstance.getExecutionId(), processVariables);
+
+    // Business Key
+    runtimeService.createMessageCorrelation(messageName)
+      .processInstanceBusinessKey(correlationKey) // requires unique business key
+      .setVariable("payload", payload)
+      .correlate();
+  
   }
   
   public void triggerAsynchronousCallback(String asynchronousCorrelationKey) {

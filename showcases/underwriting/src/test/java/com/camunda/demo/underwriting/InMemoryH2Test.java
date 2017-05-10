@@ -3,13 +3,15 @@ package com.camunda.demo.underwriting;
 import static org.camunda.bpm.engine.test.assertions.ProcessEngineAssertions.assertThat;
 import static org.camunda.bpm.engine.test.assertions.ProcessEngineAssertions.init;
 import static org.camunda.bpm.engine.test.assertions.ProcessEngineAssertions.processEngine;
-import static org.camunda.bpm.engine.test.assertions.ProcessEngineTests.complete;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
 
+import org.camunda.bpm.dmn.engine.DmnDecisionTableResult;
+import org.camunda.bpm.dmn.engine.DmnEngine;
+import org.camunda.bpm.dmn.engine.impl.DefaultDmnEngineConfiguration;
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.history.HistoricCaseActivityInstance;
 import org.camunda.bpm.engine.history.HistoricCaseInstance;
@@ -26,9 +28,7 @@ import org.camunda.bpm.engine.variable.Variables;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.mvel2.ast.Contains;
 
-import com.camunda.demo.underwriting.Constants;
 import com.camunda.demo.underwriting.domain.Application;
 
 /**
@@ -68,6 +68,29 @@ public class InMemoryH2Test {
   }
 
   @Test
+  @Deployment(resources = "determine-underwriter.dmn")
+  public void testParseDmn() {
+    // nothing is done here, as we just want to check for exceptions during
+    // deployment
+  }
+  
+  @Test
+  public void testExtendedRule() {
+    
+    Application application = new Application();
+    application.setAge(70);
+    application.setRisk("low");
+    application.setType("extended");
+    
+    DmnEngine dmnEngine = new DefaultDmnEngineConfiguration().buildEngine();
+    DmnDecisionTableResult decisionResult = dmnEngine.evaluateDecisionTable(
+        dmnEngine.parseDecision("determineUnderwriter", this.getClass().getResourceAsStream("/determine-underwriter.dmn")),
+        Variables.createVariables().putValue("application", application));
+    
+    System.out.println(decisionResult.get(0));
+  }
+  
+  @Test
   @Deployment(resources = "underwriting-case.cmmn")
   public void testUnderwritingCase() {
     ProcessEngine processEngine = processEngine();
@@ -75,7 +98,7 @@ public class InMemoryH2Test {
     // HashMap containing variables to be added to case instance
     VariableMap variables = Variables.createVariables() //
         .putValue("application", new Application()) //
-        .putValue("capableUnderwriters", "demo");
+        .putValue("underwriter", "demo");
 
     // create the case instance
     CaseInstance caseInstance = processEngine.getCaseService().createCaseInstanceByKey("underwriting", variables);
@@ -138,9 +161,11 @@ public class InMemoryH2Test {
   }
 
   @Test
-  @Deployment(resources = { "underwriting-case.cmmn", "underwriting-process.bpmn" })
+  @Deployment(resources = { "underwriting-case.cmmn", "underwriting-process.bpmn", "determine-underwriter.dmn" })
   public void testUnderwritingProcessIncludingCase() {
-    VariableMap variables = Variables.createVariables().putValue("application", new Application());
+    Application application = new Application();
+    application.setType("extended"); // peter
+    VariableMap variables = Variables.createVariables().putValue("application", application);
 
     ProcessInstance pi = processEngine().getRuntimeService().startProcessInstanceByMessage(Constants.MSG_START_ELECTRONIC_APPLICATION, variables);
 
@@ -182,12 +207,12 @@ public class InMemoryH2Test {
   }
 
   @Test
-  @Deployment(resources = { "underwriting-case.cmmn", "underwriting-process.bpmn" })
+  @Deployment(resources = { "underwriting-case.cmmn", "underwriting-process.bpmn", "determine-underwriter.dmn" })
   public void testAssignmentRules() {
     Application application = new Application();
-    application.setAge(50);
-    application.setRisk("niedrig");
-    application.setType("gesetzlich");
+    application.setAge(30);
+    application.setRisk("low");
+    application.setType("basic");
 
     ProcessInstance pi = processEngine().getRuntimeService().startProcessInstanceByMessage( //
         Constants.MSG_START_ELECTRONIC_APPLICATION, //
@@ -207,12 +232,12 @@ public class InMemoryH2Test {
   }
   
   @Test
-  @Deployment(resources = { "underwriting-case.cmmn", "underwriting-process.bpmn" })
+  @Deployment(resources = { "underwriting-case.cmmn", "underwriting-process.bpmn", "determine-underwriter.dmn" })
   public void testAssignmentRules2() {
     Application application = new Application();
     application.setAge(70);
-    application.setRisk("niedrig");
-    application.setType("Chefarztgarantie");
+    application.setRisk("low");
+    application.setType("extended");
 
     ProcessInstance pi = processEngine().getRuntimeService().startProcessInstanceByMessage( //
         Constants.MSG_START_ELECTRONIC_APPLICATION, //

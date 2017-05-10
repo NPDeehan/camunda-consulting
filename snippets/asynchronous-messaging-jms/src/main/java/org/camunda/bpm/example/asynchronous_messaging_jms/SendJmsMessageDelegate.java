@@ -14,6 +14,9 @@ import javax.jms.TextMessage;
 
 import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
+import org.camunda.bpm.model.bpmn.instance.FlowElement;
+import org.camunda.bpm.model.bpmn.instance.FlowNode;
+import org.camunda.bpm.model.bpmn.instance.SendTask;
 
 /**
  * This is an empty service implementation illustrating how to use a plain Java 
@@ -31,10 +34,19 @@ public class SendJmsMessageDelegate implements JavaDelegate {
   private QueueConnectionFactory connectionFactory;
 
   public void execute(DelegateExecution execution) throws Exception {
+    // Not Recommended
 //    String asynchronousCorrelationKey = execution.getId();
+
+    // UUID
 //    String asynchronousCorrelationKey = UUID.randomUUID().toString();
+//    execution.setVariable("correlationId", asynchronousCorrelationKey);
+    
+    String currentActivityId = execution.getCurrentActivityId();
+    FlowNode receiveTask = ((SendTask) execution.getBpmnModelElementInstance()).getSucceedingNodes().singleResult();
+    String receiveTaskId = receiveTask.getId();
+
+    // Business Key
     String asynchronousCorrelationKey = execution.getProcessBusinessKey();
-    execution.setVariable("correlationId", asynchronousCorrelationKey);
     
     Connection connection = connectionFactory.createConnection();
     Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);

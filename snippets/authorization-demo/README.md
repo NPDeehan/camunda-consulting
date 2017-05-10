@@ -1,7 +1,9 @@
-authorization-demo
+Authorized User Tasks
 =========================
 
 In our project people asking for security, how can we assure that only users complete tasks that they are allowed to. This snippet shows how you can get there.
+
+**This snippet is obsolete since camunda BPM 7.3.0. Use** [Authorization Service](http://docs.camunda.org/7.3/guides/user-guide/#process-engine-authorization-service) **instead.**
 
 
 Show me the important parts!
